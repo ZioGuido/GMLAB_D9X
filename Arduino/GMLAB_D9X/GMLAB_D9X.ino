@@ -422,6 +422,7 @@ void DoButton(int btn, int status)
       {
         // Disengage the brake..
         Latches.RotaryRunStop = 0;
+        SendMidiCC(0, kMidiCC_RotaryRunStop, Latches.RotaryRunStop ? 127 : 0); 
         SetLed(LED_RUNSTOP, Latches.RotaryRunStop);
         EEPROM.write(EEPROM_SPEED_RUNSTOP, Latches.RotaryRunStop);
       }
