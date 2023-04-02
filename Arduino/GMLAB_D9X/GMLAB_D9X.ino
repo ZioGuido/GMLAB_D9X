@@ -105,7 +105,7 @@ int CVvalues[6] = { 0, 27, 52, 78, 102, 127 };
 #define LED_SEL_LO   22
 #define LED_SEL_PD   23
 #define BTN_SLOWFAST 24
-
+#define LED_ARDUINO  17
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // External libraries
@@ -116,9 +116,9 @@ int CVvalues[6] = { 0, 27, 52, 78, 102, 127 };
 MIDI_CREATE_DEFAULT_INSTANCE();
 #include <EEPROM.h>
 #include <Wire.h> // Needed to access the I2C bus
-#include "Adafruit_MCP23017.h" // This is needed for the two I/O Expanders
-Adafruit_MCP23017 mcp0;
-Adafruit_MCP23017 mcp1;
+#include "Adafruit_MCP23X17.h" // This is needed for the two I/O Expanders
+Adafruit_MCP23X17 mcp0;
+Adafruit_MCP23X17 mcp1;
 #include "MillisTimer.h"  // This library creates a timer with millisecond precision
 MillisTimer ButtonTimer;  // This is used for checking the buttons
 MillisTimer LedAnimTimer; // This is used for animating the "speed" PWM-driven LED
@@ -197,7 +197,7 @@ struct LatchesStruct
 // This helper function maps the pins to the appropriate MCP expander and sets the required modes
 void pinModeMCP(int pin, int mode)
 {
-  Adafruit_MCP23017 *mcp = pin > 15 ? &mcp1 : &mcp0;
+  Adafruit_MCP23X17 *mcp = pin > 15 ? &mcp1 : &mcp0;
   int mcp_pin = pin > 15 ? pin - 16 : pin;
   
   switch (mode)
@@ -211,8 +211,7 @@ void pinModeMCP(int pin, int mode)
     break;
 
   case INPUT_PULLUP:
-    mcp->pinMode(mcp_pin, INPUT);
-    mcp->pullUp(mcp_pin, HIGH);
+    mcp->pinMode(mcp_pin, INPUT_PULLUP);
     break;
   }
 }
@@ -459,22 +458,47 @@ void CheckButtons()
   }
 }
 
+// Blink the LEDS and don't return
+bool ErrorState()
+{
+  unsigned char s = HIGH;
+  // Make it jerky so that we can differentiate it from rotor speed
+  char *blinks = "10101000001010100000";
+  while (1)
+  {
+    for (unsigned char i = 0; i < 20; i++)
+    {
+      s = (blinks[i] == '0') ? LOW : HIGH;
+      digitalWrite(LED_ARDUINO, s);
+      digitalWrite(PWM_LED_SPEED,s);
+      delay(100); // Since the Speed LED can flash in normal operation make it super fast
+    }
+  }
+  // Never actually returns, but this is necessary to make the compiler
+  // happy and allows us to use boolean short circuit logic
+  return false;
+}
+
 // Called once at boot time to set all I/Os and initialize variables and other stuff
 void setup()
 {
+  // initialize Arduino LEDS first - so we can blink if we land in error state
+  // Arduino LED - for error conditions
+  pinMode(LED_ARDUINO, OUTPUT);
+
+  // This is the PWM output for the Slow/Fast LED
+  pinMode(PWM_LED_SPEED, OUTPUT);
+
   // Define pins for the two CD4051 analog multiplexers
   pinMode(CD4051_A, OUTPUT); // A
   pinMode(CD4051_B, OUTPUT); // B
   pinMode(CD4051_C, OUTPUT); // C
 
-  // This is the PWM output for the Slow/Fast LED
-  pinMode(PWM_LED_SPEED, OUTPUT);
-
   // Initialize the two MCP23017 expanders on the I2C bus
-  mcp0.begin(0);
-  mcp1.begin(1);
+  mcp0.begin_I2C(0x20) || ErrorState();
+  mcp1.begin_I2C(0x21) || ErrorState();
   
-  // Set all buttons in INPUT mode and activate the internal 100K pull-up resistors
+    // Set all buttons in INPUT mode and activate the internal 100K pull-up resistors
   pinModeMCP(BTN_VIB_ON,    INPUT_PULLUP);
   pinModeMCP(BTN_VIB_TYP,   INPUT_PULLUP);
   pinModeMCP(BTN_RUNSTOP,   INPUT_PULLUP);
@@ -485,7 +509,7 @@ void setup()
   pinModeMCP(BTN_DRB_SEL,   INPUT_PULLUP);
   pinModeMCP(BTN_SHIFT,     INPUT_PULLUP);
   pinModeMCP(BTN_SLOWFAST,  INPUT_PULLUP);
-  
+
   // Set all LEDs in OUTPUT mode
   pinModeMCP(LED_SEL_UP, OUTPUT);
   pinModeMCP(LED_SEL_LO, OUTPUT);
