@@ -1,5 +1,3 @@
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Arduino sketch for the GMLAB D9X
 // An open source Do-It-Yourself advanced drawbar controller with 9 drawbars, buttons and knobs for controlling
 // virtual tonewheel organs via MIDI CC messages. Mapped to control GSi VB3-II, but compatible with similar products.
 // Could be easily remapped for other instruments, or modified to send other types of Midi messages.
@@ -334,6 +332,7 @@ void DoButton(int btn, int status)
         SendMidiCC(0, kMidiCC_RotaryOnOff, Latches.RotaryOnOff ? 127 : 0);
         EEPROM.write(EEPROM_ROTARY_ONOFF, Latches.RotaryOnOff);
       }
+        
       // Skip the rest of the function
       return; 
     }
@@ -460,15 +459,16 @@ void CheckButtons()
 
 // Blink the LEDS and don't return
 bool ErrorState()
-{
-  unsigned char s = HIGH;
+{ 
+  
+  unsigned char s;
   // Make it jerky so that we can differentiate it from rotor speed
-  char *blinks = "10101000001010100000";
+  int blink_pattern = 0x808a;
   while (1)
   {
-    for (unsigned char i = 0; i < 20; i++)
-    {
-      s = (blinks[i] == '0') ? LOW : HIGH;
+    for (int i = 0; i < 16; i++)
+    {   
+      s = (blink_pattern >> i) & 0x1;
       digitalWrite(LED_ARDUINO, s);
       digitalWrite(PWM_LED_SPEED,s);
       delay(100); // Since the Speed LED can flash in normal operation make it super fast
@@ -487,7 +487,7 @@ void setup()
   pinMode(LED_ARDUINO, OUTPUT);
 
   // This is the PWM output for the Slow/Fast LED
-  pinMode(PWM_LED_SPEED, OUTPUT);
+  pinMode(PWM_LED_SPEED, OUTPUT);  
 
   // Define pins for the two CD4051 analog multiplexers
   pinMode(CD4051_A, OUTPUT); // A
